@@ -81,4 +81,4 @@ This project is serverless and runs directly in the browser!
 * [ ] Offline Mode support using PWA Service Workers.
 
 ---
-*Built with ❤️ for the Google Developer Student Clubs Hackathon.*
+*Built with ❤️ for the  KOUSHAL-Google Developer Student Clubs Hackathon Member.*
