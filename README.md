@@ -66,7 +66,7 @@ This project is serverless and runs directly in the browser!
 
 1.  **Clone the Repo:**
     ```bash
-    git clone [https://github.com/your-username/nit-health-project.git](https://github.com/your-username/nit-health-project.git)
+    git clone [https://github.com/koushal37/nit-health-project.git](https://github.com/koushal37/nit-health-project.git)
     ```
 2.  **Open Student Portal:**
     Open `index.html` in your browser (Mobile view recommended).
