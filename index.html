@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIT Health - Student</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+
+    <style>
+        :root { --primary: #0284c7; --bg: #f0f9ff; --text: #334155; --success: #10b981; --danger: #ef4444; }
+        
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { width: 100%; max-width: 450px; background: white; border-radius: 24px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.1); overflow: hidden; height: fit-content; }
+
+        /* HEADER */
+        .header { background: linear-gradient(135deg, #0284c7, #0ea5e9); padding: 30px; text-align: center; color: white; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 800; }
+        
+        /* CONTENT */
+        .content { padding: 25px; }
+        label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; display: block; letter-spacing: 0.5px; }
+        input, textarea { width: 100%; padding: 14px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; margin-bottom: 15px; box-sizing: border-box; }
+        
+        .btn { width: 100%; padding: 16px; border: none; border-radius: 12px; font-weight: 700; background: var(--primary); color: white; cursor: pointer; font-size: 16px; }
+        .btn:disabled { opacity: 0.7; }
+
+        /* STATUS PAGE */
+        #statusPage { display: none; text-align: center; padding: 30px 20px; }
+        .token-circle { width: 140px; height: 140px; background: #e0f2fe; color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 800; margin: 20px auto; }
+        
+        /* AI CARD */
+        .ai-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 16px; padding: 15px; margin: 20px 0; text-align: left; }
+        .ai-text { font-size: 14px; color: #166534; font-weight: 500; font-style: italic; }
+
+        /* LIVE QUEUE LIST (Simple) */
+        .live-queue-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-top: 20px; padding: 0; max-height: 250px; overflow-y: auto; text-align: left; }
+        .q-header { padding: 10px 15px; background: #f1f5f9; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0; }
+        .q-item { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 14px; align-items: center; }
+        .q-item.active { background: #ecfdf5; border-left: 4px solid var(--success); }
+        
+        /* TIMER */
+        .timer-box { background: #fee2e2; border: 2px solid var(--danger); border-radius: 16px; padding: 20px; color: #991b1b; display: none; margin-top: 20px; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🏥 NIT Health Center</h1>
+        <div style="font-size:12px; opacity:0.9; margin-top:5px;">Smart Queue System</div>
+    </div>
+
+    <div id="formPage" class="content">
+        <label>Roll Number</label>
+        <input type="text" id="roll" placeholder="125EE0077">
+        <label>ID Card</label>
+        <input type="file" id="idCard" accept="image/*">
+        <label>Symptoms</label>
+        <textarea id="symptoms" rows="2" placeholder="e.g. Fever, headache..."></textarea>
+        <button onclick="handleCheckIn()" id="btnSubmit" class="btn">Verify & Get Token</button>
+        
+        <div style="margin-top:20px;">
+            <div class="live-queue-box">
+                <div class="q-header">Current Queue</div>
+                <div id="queueListFront" style="padding:15px; text-align:center; color:#94a3b8;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusPage">
+        <div style="font-size:12px; font-weight:700; color:#64748b;">YOUR TOKEN</div>
+        <div class="token-circle" id="myToken">--</div>
+        
+        <div id="statusMsg" style="color:#64748b; font-size:14px;">Waiting in queue...</div>
+        <div id="posMsg" style="color:var(--primary); font-weight:700; font-size:13px; margin-top:5px;">Calculating...</div>
+
+        <div class="ai-card">
+            <div style="font-size:10px; font-weight:800; color:#15803d; margin-bottom:5px;">✨ AI NURSE</div>
+            <div class="ai-text" id="aiSuggestion">Analyzing your symptoms...</div>
+        </div>
+
+        <div id="timerBox" class="timer-box">
+            <h2 style="margin:0; font-size:18px;">📢 DOCTOR CALLING!</h2>
+            <h1 id="timer" style="font-size:42px; margin:5px 0;">02:00</h1>
+            <p style="margin:0; font-size:12px;">Run to the doctor's room!</p>
+        </div>
+
+        <div class="live-queue-box">
+            <div class="q-header">Live Updates</div>
+            <div id="queueListBack">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<canvas id="compressCanvas" style="display:none;"></canvas>
+
+<script>
+    // --- CONFIGURATION ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCdG5XqoXjwdvV_BeejncszIdEkdk9dJhs",
+        authDomain: "nit-queuemanagementr.firebaseapp.com",
+        projectId: "nit-queuemanagementr",
+        storageBucket: "nit-queuemanagementr.firebasestorage.app",
+        messagingSenderId: "663115393364",
+        appId: "1:663115393364:web:3e6beafc07a59baafcc0c1"
+    };
+    const GEMINI_API_KEY = "AIzaSyAH1Etps1LCs0gctdzAv9kjgfksgoFb2L0"; 
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let myDocId = null;
+    let myTokenNum = 0;
+    let timerInt = null;
+    let worker = null;
+    let notified5Min = false;
+
+    if ("Notification" in window) Notification.requestPermission();
+
+    // 1. COMPRESSOR (Speed Fix)
+    function compressImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                    const c = document.getElementById('compressCanvas');
+                    const ctx = c.getContext('2d');
+                    const scale = 600 / img.width;
+                    c.width = 600; c.height = img.height * scale;
+                    ctx.drawImage(img, 0, 0, c.width, c.height);
+                    resolve(c.toDataURL('image/jpeg', 0.5));
+                };
+            };
+        });
+    }
+
+    // 2. CHECK-IN LOGIC
+    (async () => { worker = await Tesseract.createWorker("eng"); })();
+
+    async function handleCheckIn() {
+        const roll = document.getElementById('roll').value.trim();
+        const symptoms = document.getElementById('symptoms').value.trim();
+        const file = document.getElementById('idCard').files[0];
+        const btn = document.getElementById('btnSubmit');
+
+        if(!roll || !file || !symptoms) return alert("Please fill all fields");
+
+        btn.disabled = true;
+        btn.innerText = "⚡ Verifying ID...";
+
+        try {
+            // A. Local OCR
+            const img = await compressImage(file);
+            if(!worker) worker = await Tesseract.createWorker("eng");
+            const res = await worker.recognize(img);
+            
+            const text = res.data.text.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanRoll = roll.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const smartText = text.replace(/0/g,'o').replace(/1/g,'i').replace(/5/g,'s');
+            const smartRoll = cleanRoll.replace(/0/g,'o').replace(/1/g,'i').replace(/5/g,'s');
+
+            if(!smartText.includes(smartRoll) || smartRoll.length < 3) {
+                // FALLBACK: Allow manual override for demo if OCR struggles
+                if(!confirm("⚠️ Auto-Scan unclear. Is the Roll Number correct? Press OK to proceed.")) {
+                    throw new Error("Verification Cancelled.");
+                }
+            }
+
+            // B. Join Queue (Simple Add)
+            btn.innerText = "Joining...";
+            const snap = await db.collection('queue').get();
+            myTokenNum = snap.size + 1; 
+
+            const doc = await db.collection('queue').add({
+                token: myTokenNum,
+                rollNumber: roll,
+                symptoms: symptoms,
+                status: 'waiting',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            myDocId = doc.id;
+
+            // C. Switch UI
+            document.getElementById('formPage').style.display = 'none';
+            document.getElementById('statusPage').style.display = 'block';
+            document.getElementById('myToken').innerText = "#" + myTokenNum;
+            
+            getAIAdvice(symptoms);
+            watchMyStatus();
+
+        } catch(e) {
+            alert(e.message);
+            btn.disabled = false;
+            btn.innerText = "Verify & Get Token";
+        }
+    }
+
+    // 3. AI NURSE (With Backup)
+    async function getAIAdvice(sym) {
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ contents: [{ parts: [{ text: `Give 1 short sentence of home remedy for: ${sym}` }] }] })
+            });
+            const d = await res.json();
+            const advice = d.candidates[0].content.parts[0].text;
+            document.getElementById('aiSuggestion').innerText = advice;
+        } catch(e) { 
+            // FALLBACK if AI fails
+            document.getElementById('aiSuggestion').innerText = "Drink plenty of water and rest while you wait."; 
+        }
+    }
+
+    // 4. WATCH STATUS
+    function watchMyStatus() {
+        db.collection('queue').doc(myDocId).onSnapshot(doc => {
+            const d = doc.data();
+            if(d.status === 'called') {
+                document.getElementById('timerBox').style.display = 'block';
+                startTimer();
+                if("Notification" in window && Notification.permission === "granted") new Notification("Doctor Called You!");
+            } else if(d.status === 'serving') {
+                document.getElementById('timerBox').style.display = 'none';
+                document.getElementById('statusMsg').innerText = "✅ You are currently with the doctor.";
+                document.getElementById('statusMsg').style.color = "#10b981";
+                document.getElementById('statusMsg').style.fontWeight = "bold";
+            } else if(d.status === 'served') {
+                alert("Visit Completed!");
+                location.reload();
+            }
+        });
+    }
+
+    function startTimer() {
+        let sec = 120;
+        clearInterval(timerInt);
+        timerInt = setInterval(() => {
+            sec--;
+            let m = Math.floor(sec/60);
+            let s = sec%60;
+            document.getElementById('timer').innerText = `0${m}:${s<10?'0'+s:s}`;
+            if(sec<=0) clearInterval(timerInt);
+        }, 1000);
+    }
+
+    // 5. FAIL-SAFE LIVE QUEUE (Shows on both pages)
+    db.collection('queue').onSnapshot(snap => {
+        let html = "";
+        let currentServingToken = 0;
+        let myPos = 0;
+
+        const patients = [];
+        snap.forEach(doc => patients.push(doc.data()));
+        patients.sort((a,b) => a.token - b.token); // JS Sort (No Index Error)
+
+        patients.forEach(d => {
+            // Only show relevant statuses
+            if(d.status === 'waiting' || d.status === 'called' || d.status === 'serving') {
+                let statusBadge = `<span style="color:#64748b">Waiting</span>`;
+                let rowClass = "";
+
+                if(d.status === 'called') {
+                    currentServingToken = d.token;
+                    statusBadge = `<span style="color:#ef4444; font-weight:bold;">CALLED</span>`;
+                    rowClass = "active";
+                } else if (d.status === 'serving') {
+                    statusBadge = `<span style="color:#10b981; font-weight:bold;">IN ROOM</span>`;
+                    rowClass = "active";
+                }
+
+                html += `
+                    <div class="q-item ${rowClass}">
+                        <div><b>#${d.token}</b> <span style="margin-left:5px; font-size:12px;">${d.rollNumber}</span></div>
+                        ${statusBadge}
+                    </div>`;
+            }
+        });
+
+        if(html === "") html = "<div style='padding:15px; text-align:center; color:#ccc'>Queue is empty</div>";
+
+        // Update BOTH lists
+        document.getElementById('queueListFront').innerHTML = html;
+        document.getElementById('queueListBack').innerHTML = html;
+
+        // Position Calculation
+        if(myTokenNum > 0 && currentServingToken > 0) {
+            const peopleAhead = myTokenNum - currentServingToken;
+            if(peopleAhead > 0) document.getElementById('posMsg').innerText = `${peopleAhead} people ahead of you.`;
+            else document.getElementById('posMsg').innerText = "You are next!";
+            
+            if(peopleAhead === 1 && !notified5Min) {
+                if("Notification" in window) new Notification("⚠️ Get Ready! You are next.");
+                notified5Min = true; 
+            }
+        }
+    });
+</script>
+</body>
+</html>

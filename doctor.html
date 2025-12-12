@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Doctor Dashboard</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #eef2f6; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; margin-bottom: 10px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        .btn-call { background: #0ea5e9; color: white; }
+        .btn-enter { background: #3b82f6; color: white; }
+        .btn-done { background: #10b981; color: white; }
+    </style>
+</head>
+<body>
+    <h1>👨‍⚕️ Doctor Dashboard</h1>
+    
+    <div id="activeBox" style="background:#d1fae5; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid #10b981; display:none;">
+        <h3 style="margin:0; color:#065f46;">NOW SERVING</h3>
+        <div id="activeContent"></div>
+    </div>
+
+    <h3>Waiting List (<span id="count">0</span>)</h3>
+    <div id="list">Loading...</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCdG5XqoXjwdvV_BeejncszIdEkdk9dJhs",
+        authDomain: "nit-queuemanagementr.firebaseapp.com",
+        projectId: "nit-queuemanagementr",
+        storageBucket: "nit-queuemanagementr.firebasestorage.app",
+        messagingSenderId: "663115393364",
+        appId: "1:663115393364:web:3e6beafc07a59baafcc0c1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    db.collection('queue').where('status', 'in', ['waiting', 'called', 'serving']).onSnapshot(snap => {
+        const listDiv = document.getElementById('list');
+        const activeBox = document.getElementById('activeBox');
+        const activeContent = document.getElementById('activeContent');
+        
+        listDiv.innerHTML = "";
+        let count = 0;
+        let hasActive = false;
+
+        const patients = [];
+        snap.forEach(doc => patients.push({ id: doc.id, ...doc.data() }));
+        patients.sort((a,b) => a.token - b.token);
+
+        patients.forEach(p => {
+            if(p.status === 'called') {
+                hasActive = true;
+                activeBox.style.display = 'block';
+                activeContent.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h2 style="margin:0;">#${p.token}</h2>
+                            <div>${p.rollNumber}</div>
+                            <div style="font-size:12px; color:red; font-weight:bold;">⚠️ Calling (Timer Started)...</div>
+                        </div>
+                        <button onclick="setStatus('${p.id}', 'serving')" class="btn btn-enter">✅ PATIENT ENTERED</button>
+                    </div>`;
+            } 
+            else if(p.status === 'serving') {
+                hasActive = true;
+                activeBox.style.display = 'block';
+                activeContent.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h2 style="margin:0; color:green;">#${p.token}</h2>
+                            <div>${p.rollNumber}</div>
+                            <div style="font-size:12px; color:green;">🩺 Visit in Progress</div>
+                        </div>
+                        <button onclick="setStatus('${p.id}', 'served')" class="btn btn-done">🏁 FINISH / DONE</button>
+                    </div>`;
+            }
+            else {
+                count++;
+                listDiv.innerHTML += `
+                    <div class="card">
+                        <div>
+                            <span style="font-weight:bold;">#${p.token}</span>
+                            <span style="margin-left:10px;">${p.rollNumber}</span>
+                            <div style="font-size:12px; color:#666;">${p.symptoms}</div>
+                        </div>
+                        <button onclick="setStatus('${p.id}', 'called')" class="btn btn-call">📢 CALL</button>
+                    </div>`;
+            }
+        });
+
+        document.getElementById('count').innerText = count;
+        if(!hasActive) activeBox.style.display = 'none';
+        if(count === 0) listDiv.innerHTML = "<p style='color:#999'>No patients waiting.</p>";
+    });
+
+    window.setStatus = (id, status) => {
+        db.collection('queue').doc(id).update({ status: status });
+    };
+</script>
+</body>
+</html>
